@@ -35,11 +35,44 @@ body::before{content:'';position:fixed;inset:0;
   font-family:'Cairo',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;transition:.2s;}
 .tab.on{background:var(--b2);color:var(--tx);}
 lbl{display:block;font-size:.7rem;color:var(--mt);margin-bottom:4px;font-weight:700;}
-inp{display:block;width:100%;padding:10px 12px;background:var(--s2);
-  border:1px solid var(--b2);border-radius:7px;color:var(--tx);
-  font-family:'Cairo',sans-serif;font-size:.87rem;outline:none;margin-bottom:13px;transition:.2s;}
-inp:focus{border-color:var(--c1);}
-inp::placeholder{color:var(--mt);}
+.lbl{display:block;font-size:.72rem;color:var(--mt);margin-bottom:6px;font-weight:700;}
+.finp{
+  display:block;width:100%;
+  padding:13px 14px;
+  background:var(--s2);
+  border:1.5px solid var(--b2);
+  border-radius:9px;
+  color:var(--tx);
+  font-family:'Cairo',sans-serif;
+  font-size:1rem;
+  outline:none;
+  margin-bottom:12px;
+  transition:border-color .2s;
+  -webkit-appearance:none;
+  appearance:none;
+}
+.finp:focus{border-color:var(--c1);}
+.finp::placeholder{color:var(--mt);}
+.code-inp{
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  font-size:1.1rem;
+  font-weight:700;
+  text-align:center;
+}
+.divider{
+  text-align:center;color:var(--mt);font-size:.7rem;
+  margin:10px 0;position:relative;
+}
+.divider::before,.divider::after{
+  content:'';position:absolute;top:50%;width:35%;height:1px;background:var(--b2);
+}
+.divider::before{right:0;}.divider::after{left:0;}
+.bsec{
+  background:var(--b2)!important;
+  color:var(--tx)!important;
+  box-shadow:none!important;
+}
 .mrow{display:flex;gap:7px;margin-bottom:13px;}
 .mopt{flex:1;padding:8px;background:var(--s2);border:1px solid var(--b1);
   border-radius:7px;color:var(--mt);font-family:'Cairo',sans-serif;
@@ -205,27 +238,18 @@ inp::placeholder{color:var(--mt);}
 <div class="card">
   <div class="logo">💣 لعبة الصناديق</div>
   <div class="sub">اكتشف شعلتك — ارسم الفتيل — فجّر القنبلة</div>
-  <div class="tabs">
-    <div class="tab on" id="T1" onclick="switchTab(1)">إنشاء غرفة</div>
-    <div class="tab"    id="T2" onclick="switchTab(2)">انضمام</div>
-  </div>
-  <div id="F1">
-    <lbl>اسمك</lbl>
-    <inp id="cN" placeholder="اكتب اسمك..." maxlength="14" class="a"></inp>
-    <lbl>نوع اللعبة</lbl>
-    <div class="mrow">
-      <div class="mopt on" id="MI" onclick="setMode('ind')">فردي 👤</div>
-      <div class="mopt"    id="MT" onclick="setMode('team')">فرق 🤝</div>
-    </div>
-    <button class="bmain" onclick="doCreate()">🎲 إنشاء الغرفة</button>
-  </div>
-  <div id="F2" style="display:none">
-    <lbl>اسمك</lbl>
-    <inp id="jN" placeholder="اكتب اسمك..." maxlength="14" class="a"></inp>
-    <lbl>كود الغرفة</lbl>
-    <inp id="jC" placeholder="4 أحرف..." maxlength="4" style="letter-spacing:.15em;text-transform:uppercase;" class="a"></inp>
-    <button class="bmain" onclick="doJoin()">🚀 انضمام</button>
-  </div>
+
+  <label class="lbl">اسمك</label>
+  <input type="text" id="playerName" class="finp" placeholder="اكتب اسمك..." maxlength="14" autocomplete="off">
+
+  <div class="divider">أو</div>
+
+  <button class="bmain" onclick="doCreate()">🎲 إنشاء غرفة جديدة</button>
+
+  <div class="divider">أو ادخل كود غرفة موجودة</div>
+
+  <input type="text" id="roomCode" class="finp code-inp" placeholder="كود الغرفة..." maxlength="4" autocomplete="off" autocorrect="off" spellcheck="false">
+  <button class="bmain bsec" onclick="doJoin()">🚀 انضمام للغرفة</button>
 </div>
 </div>
 
@@ -311,23 +335,6 @@ function toast(msg,t='ti',d=2300){
 }
 function setS(txt,c=''){const e=document.getElementById('SB');e.textContent=txt;e.className='sbar '+(c||'');}
 
-/* ════ LOBBY ════ */
-function switchTab(n){
-  document.getElementById('T1').classList.toggle('on',n===1);
-  document.getElementById('T2').classList.toggle('on',n===2);
-  sv('F1',n===1);sv('F2',n===2);
-}
-function setMode(m){
-  gMode=m;
-  document.getElementById('MI').classList.toggle('on',m==='ind');
-  document.getElementById('MT').classList.toggle('on',m==='team');
-}
-// style inputs
-document.querySelectorAll('inp').forEach(e=>{e.style.cssText='display:block;width:100%;padding:10px 12px;background:var(--s2);border:1px solid var(--b2);border-radius:7px;color:var(--tx);font-family:Cairo,sans-serif;font-size:.87rem;outline:none;margin-bottom:13px;transition:.2s;';
-  e.addEventListener('focus',()=>e.style.borderColor='var(--c1)');
-  e.addEventListener('blur',()=>e.style.borderColor='var(--b2)');
-});
-
 /* ════ ABLY ════ */
 function initAbly(cb){
   myId=uid();
@@ -350,9 +357,9 @@ function subCh(code){
 
 /* ════ CREATE / JOIN ════ */
 function doCreate(){
-  const n=document.getElementById('cN').value.trim();
-  if(!n){toast('اكتب اسمك','tb');return;}
-  myName=n;roomCode=genCode();isHost=true;
+  const n=document.getElementById('playerName').value.trim();
+  if(!n){toast('اكتب اسمك أولاً','tb');return;}
+  myName=n;roomCode=genCode();isHost=true;gMode='ind';
   initAbly(()=>{
     subCh(roomCode);
     players=[{id:myId,name:myName,ci:0,team:0}];
@@ -362,15 +369,14 @@ function doCreate(){
   });
 }
 function doJoin(){
-  const n=document.getElementById('jN').value.trim();
-  const c=document.getElementById('jC').value.trim().toUpperCase();
-  if(!n){toast('اكتب اسمك','tb');return;}
+  const n=document.getElementById('playerName').value.trim();
+  const c=document.getElementById('roomCode').value.trim().toUpperCase();
+  if(!n){toast('اكتب اسمك أولاً','tb');return;}
   if(c.length!==4){toast('الكود 4 أحرف','tb');return;}
-  myName=n;roomCode=c;isHost=false;
+  myName=n;roomCode=c;isHost=false;gMode='ind';
   initAbly(()=>{
     subCh(roomCode);
-    const ci=0; // host assigns final colors on start
-    const me={id:myId,name:myName,ci,team:0};
+    const me={id:myId,name:myName,ci:0,team:0};
     players.push(me);ch.publish('pj',me);
     goTo('SL','SW');
     document.getElementById('WC').textContent=roomCode;
