@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>💣 لعبة الصناديق - متعددة اللاعبين</title>
+<script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & BASE ── */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#060810;
+  --bg2:#0d1017;
+  --bg3:#131720;
+  --border:#1e2433;
+  --border2:#2a3145;
+  --text:#e8eaf0;
+  --text2:#8892a4;
+  --text3:#4a5568;
+  --accent:#f59e0b;
+  --p1:#3b82f6; /* blue  */
+  --p2:#f59e0b; /* yellow*/
+  --p3:#ef4444; /* red   */
+  --p4:#22c55e; /* green */
+  --bomb:#c026d3;/* purple*/
+  --radius:10px;
+}
+body{
+  background:var(--bg);
+  font-family:'Cairo',sans-serif;
+  min-height:100vh;
+  color:var(--text);
+  overflow-x:hidden;
+  position:relative;
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
+  background-size:32px 32px;pointer-events:none;z-index:0;
+}
+
+/* ── LOBBY ── */
+#lobby{
+  position:fixed;inset:0;z-index:100;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f1520 0%, var(--bg) 70%);
+}
+.lobby-card{
+  width:min(420px,94vw);
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  border-radius:18px;
+  padding:32px 28px;
+  box-shadow:0 0 60px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.04);
+  text-align:center;
+}
+.lobby-title{
+  font-size:1.8rem;font-weight:900;
+  background:linear-gradient(135deg,var(--accent),#ef4444);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:4px;
+}
+.lobby-sub{color:var(--text2);font-size:.8rem;margin-bottom:28px;}
+
+.tabs{display:flex;gap:0;border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:24px;}
+.tab{flex:1;padding:10px;font-family:'Cairo',sans-serif;font-size:.85rem;font-weight:700;
+  background:transparent;border:none;color:var(--text2);cursor:pointer;transition:all .2s;}
+.tab.active{background:var(--border2);color:var(--text);}
+
+.form-group{margin-bottom:16px;text-align:right;}
+.form-label{display:block;font-size:.75rem;color:var(--text2);margin-bottom:6px;font-weight:600;}
+.form-input{
+  width:100%;padding:11px 14px;
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:8px;color:var(--text);
+  font-family:'Cairo',sans-serif;font-size:.9rem;
+  outline:none;transition:border-color .2s;
+}
+.form-input:focus{border-color:var(--accent);}
+.form-input::placeholder{color:var(--text3);}
+
+.mode-btns{display:flex;gap:8px;margin-bottom:16px;}
+.mode-btn{
+  flex:1;padding:9px;
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:8px;color:var(--text2);
+  font-family:'Cairo',sans-serif;font-size:.8rem;font-weight:700;
+  cursor:pointer;transition:all .2s;
+}
+.mode-btn.active{background:rgba(245,158,11,.15);border-color:var(--accent);color:var(--accent);}
+
+.code-display{
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:8px;padding:14px;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.code-val{font-size:1.8rem;font-weight:900;letter-spacing:.2em;color:var(--accent);}
+.copy-btn{
+  padding:6px 14px;background:var(--border2);border:none;
+  border-radius:6px;color:var(--text);font-family:'Cairo',sans-serif;
+  font-size:.75rem;cursor:pointer;transition:background .2s;
+}
+.copy-btn:hover{background:var(--border);}
+
+.primary-btn{
+  width:100%;padding:13px;
+  background:linear-gradient(135deg,var(--accent),#d97706);
+  border:none;border-radius:10px;
+  color:#000;font-family:'Cairo',sans-serif;font-size:1rem;font-weight:900;
+  cursor:pointer;transition:opacity .2s,transform .1s;
+  box-shadow:0 4px 20px rgba(245,158,11,.3);
+}
+.primary-btn:active{transform:scale(.97);}
+.primary-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── WAITING ROOM ── */
+#waitRoom{
+  position:fixed;inset:0;z-index:90;
+  display:none;align-items:center;justify-content:center;
+  background:var(--bg);
+}
+.wait-card{
+  width:min(440px,94vw);
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:18px;padding:28px;text-align:center;
+}
+.wait-title{font-size:1.2rem;font-weight:900;margin-bottom:4px;}
+.wait-code{
+  font-size:2.2rem;font-weight:900;letter-spacing:.25em;
+  color:var(--accent);margin:16px 0;
+  text-shadow:0 0 20px rgba(245,158,11,.4);
+}
+.players-list{display:flex;flex-direction:column;gap:8px;margin:20px 0;}
+.player-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;border-radius:8px;
+  background:var(--bg3);border:1px solid var(--border);
+}
+.player-color{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.player-name{font-size:.9rem;font-weight:700;}
+.player-badge{
+  margin-right:auto;font-size:.65rem;
+  padding:2px 8px;border-radius:20px;
+  background:rgba(245,158,11,.15);color:var(--accent);
+}
+.start-hint{color:var(--text2);font-size:.78rem;margin-top:8px;}
+.start-btn{
+  width:100%;padding:13px;margin-top:16px;
+  background:linear-gradient(135deg,#22c55e,#16a34a);
+  border:none;border-radius:10px;
+  color:#fff;font-family:'Cairo',sans-serif;font-size:1rem;font-weight:900;
+  cursor:pointer;transition:opacity .2s;
+  box-shadow:0 4px 20px rgba(34,197,94,.3);
+}
+.start-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── GAME SCREEN ── */
+#gameScreen{display:none;flex-direction:column;align-items:center;padding:8px 6px 80px;min-height:100vh;position:relative;z-index:1;}
+
+/* header */
+.game-header{width:min(540px,98vw);display:flex;align-items:center;justify-content:space-between;padding:8px 0;margin-bottom:6px;}
+.game-title{font-size:1rem;font-weight:900;color:var(--accent);}
+.turn-badge{
+  font-size:.75rem;font-weight:700;padding:4px 12px;
+  border-radius:20px;border:1px solid var(--border2);
+  background:var(--bg2);color:var(--text2);
+  transition:all .3s;
+}
+.turn-badge.mine{border-color:var(--accent);color:var(--accent);background:rgba(245,158,11,.1);}
+
+/* players strip */
+.players-strip{
+  display:flex;gap:6px;width:min(540px,98vw);
+  margin-bottom:8px;overflow-x:auto;scrollbar-width:none;
+}
+.players-strip::-webkit-scrollbar{display:none;}
+.p-chip{
+  flex-shrink:0;display:flex;align-items:center;gap:6px;
+  padding:6px 10px;border-radius:20px;
+  background:var(--bg2);border:1px solid var(--border);
+  transition:all .3s;
+}
+.p-chip.active-turn{border-color:var(--accent);box-shadow:0 0 12px rgba(245,158,11,.3);}
+.p-chip .dot{width:10px;height:10px;border-radius:50%;}
+.p-chip .nm{font-size:.72rem;font-weight:700;}
+.p-chip .sc{font-size:.65rem;color:var(--text2);}
+.p-chip .flame{font-size:.65rem;}
+
+/* status bar */
+.status-bar{
+  width:min(540px,98vw);padding:8px 12px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;margin-bottom:8px;
+  font-size:.8rem;color:var(--text2);text-align:center;
+  min-height:36px;display:flex;align-items:center;justify-content:center;
+  transition:all .3s;
+}
+.status-bar.warn{color:#ef4444;border-color:#ef4444;background:rgba(239,68,68,.08);}
+.status-bar.good{color:#22c55e;border-color:#22c55e;background:rgba(34,197,94,.08);}
+.status-bar.drawing{color:#f97316;border-color:#f97316;background:rgba(249,115,22,.08);}
+.status-bar.win{color:var(--accent);border-color:var(--accent);font-size:1rem;font-weight:900;}
+
+/* grid */
+.grid{
+  display:grid;grid-template-columns:repeat(10,1fr);
+  gap:2px;width:min(540px,98vw);
+  touch-action:none;user-select:none;-webkit-user-select:none;
+}
+.box{
+  aspect-ratio:1;border-radius:5px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:.75rem;position:relative;
+  transition:background .15s,border-color .15s,box-shadow .15s;
+  border:1px solid transparent;
+}
+.box.closed{background:var(--bg3);border-color:var(--border);}
+.box.closed:active:not(.draw-mode-cell){background:#1a1e2a;}
+.box.hint{background:#0d1118;border-color:var(--border2);}
+.box.draw-mode-cell{cursor:crosshair;}
+.box.path-drawn{background:#1a0e00!important;border-color:#f97316!important;box-shadow:0 0 6px rgba(249,115,22,.4)!important;}
+.box.fuse-travel{animation:fuseTrav .25s ease;}
+
+/* fire boxes per player color */
+.box.fire-p1{background:#0a0f1f;border-color:var(--p1);box-shadow:0 0 10px rgba(59,130,246,.4);}
+.box.fire-p2{background:#1a1000;border-color:var(--p2);box-shadow:0 0 10px rgba(245,158,11,.4);}
+.box.fire-p3{background:#1a0505;border-color:var(--p3);box-shadow:0 0 10px rgba(239,68,68,.4);}
+.box.fire-p4{background:#021a06;border-color:var(--p4);box-shadow:0 0 10px rgba(34,197,94,.4);}
+
+/* locked */
+.box.locked{background:#0d0d14;border-color:#1a1a26;opacity:.6;}
+.box.locked::after{content:'🔒';position:absolute;font-size:.55rem;bottom:1px;right:2px;}
+
+/* bomb flash */
+.box.bomb-flash{background:#1a0520;border-color:var(--bomb);box-shadow:0 0 18px rgba(192,38,211,.7);animation:bombFlash .5s ease;}
+.box.bomb-win{animation:bombWin .7s ease forwards;}
+
+@keyframes fuseTrav{0%{background:#3a1500;border-color:#f97316;box-shadow:0 0 12px #f97316}100%{background:var(--bg3);border-color:var(--border);box-shadow:none}}
+@keyframes bombFlash{0%{transform:scale(1.2)}100%{transform:scale(1)}}
+@keyframes bombWin{0%{background:#2a0040;border-color:var(--bomb);box-shadow:0 0 40px var(--bomb);transform:scale(1.3)}60%{transform:scale(.9)}100%{opacity:.1;transform:scale(1)}}
+@keyframes btnPulse{0%,100%{box-shadow:0 0 18px rgba(239,68,68,.4)}50%{box-shadow:0 0 32px rgba(239,68,68,.8)}}
+@keyframes lockFlash{0%{transform:scale(1.1);opacity:1}100%{transform:scale(1);opacity:.6}}
+
+.box.lock-anim{animation:lockFlash .4s ease;}
+
+/* arrows */
+.arr-wrap{display:flex;flex-direction:column;align-items:center;gap:1px;pointer-events:none;}
+.arr{display:inline-block;width:0;height:0;--s:5px;}
+.arr.up   {border-left:var(--s) solid transparent;border-right:var(--s) solid transparent;border-bottom:calc(var(--s)*1.7) solid var(--ac);}
+.arr.down {border-left:var(--s) solid transparent;border-right:var(--s) solid transparent;border-top:calc(var(--s)*1.7) solid var(--ac);}
+.arr.left {border-top:var(--s) solid transparent;border-bottom:var(--s) solid transparent;border-right:calc(var(--s)*1.7) solid var(--ac);}
+.arr.right{border-top:var(--s) solid transparent;border-bottom:var(--s) solid transparent;border-left:calc(var(--s)*1.7) solid var(--ac);}
+.arr.upleft,.arr.upright,.arr.downleft,.arr.downright{
+  width:calc(var(--s)*1.2);height:calc(var(--s)*1.2);border:0;
+  background:var(--ac);clip-path:polygon(50% 0%,100% 100%,0% 100%);
+}
+.arr.upleft{transform:rotate(-45deg);}
+.arr.upright{transform:rotate(45deg);}
+.arr.downleft{transform:rotate(-135deg);}
+.arr.downright{transform:rotate(135deg);}
+.arr-lbl{font-size:.28rem;line-height:1;opacity:.8;}
+
+/* action buttons */
+.action-btns{
+  position:fixed;bottom:0;left:0;right:0;
+  display:flex;gap:6px;padding:12px;
+  background:linear-gradient(transparent,var(--bg) 40%);
+  justify-content:center;z-index:50;
+}
+.fuse-btn{
+  padding:11px 28px;
+  background:linear-gradient(135deg,#ef4444,#b91c1c);
+  border:none;border-radius:10px;
+  color:#fff;font-family:'Cairo',sans-serif;font-size:.9rem;font-weight:900;
+  cursor:pointer;display:none;animation:btnPulse 1.2s infinite;
+}
+.cancel-btn{
+  padding:11px 18px;
+  background:transparent;border:1px solid var(--border2);
+  border-radius:10px;color:var(--text2);
+  font-family:'Cairo',sans-serif;font-size:.85rem;cursor:pointer;display:none;
+}
+.confirm-btn{
+  padding:11px 24px;
+  background:linear-gradient(135deg,var(--accent),#d97706);
+  border:none;border-radius:10px;
+  color:#000;font-family:'Cairo',sans-serif;font-size:.9rem;font-weight:900;
+  cursor:pointer;display:none;
+}
+
+/* toast */
+.toast{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:10px;padding:10px 20px;
+  font-size:.82rem;font-weight:700;
+  z-index:200;transition:transform .3s;pointer-events:none;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  white-space:nowrap;
+}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.toast.good{color:#22c55e;border-color:#22c55e;}
+.toast.bad{color:#ef4444;border-color:#ef4444;}
+.toast.info{color:var(--accent);border-color:var(--accent);}
+
+/* winner overlay */
+#winOverlay{
+  position:fixed;inset:0;z-index:150;
+  display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
+}
+.win-card{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:20px;padding:36px 32px;text-align:center;
+  width:min(380px,90vw);
+}
+.win-emoji{font-size:3.5rem;margin-bottom:12px;}
+.win-title{font-size:1.6rem;font-weight:900;margin-bottom:8px;}
+.win-sub{color:var(--text2);font-size:.85rem;margin-bottom:24px;}
+.win-again{
+  width:100%;padding:13px;
+  background:linear-gradient(135deg,var(--accent),#d97706);
+  border:none;border-radius:10px;
+  color:#000;font-family:'Cairo',sans-serif;font-size:1rem;font-weight:900;
+  cursor:pointer;
+}
+
+/* connection badge */
+.conn-badge{
+  position:fixed;top:8px;left:8px;
+  width:8px;height:8px;border-radius:50%;
+  background:#ef4444;z-index:200;
+  transition:background .5s;
+}
+.conn-badge.connected{background:#22c55e;box-shadow:0 0 6px #22c55e;}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<div class="conn-badge" id="connBadge"></div>
+<div class="toast" id="toast"></div>
+
+<!-- ══════ LOBBY ══════ -->
+<div id="lobby">
+  <div class="lobby-card">
+    <div class="lobby-title">💣 لعبة الصناديق</div>
+    <div class="lobby-sub">اكتشف الشعلة — ارسم الفتيل — فجّر القنبلة</div>
+
+    <div class="tabs">
+      <div class="tab active" id="tabCreate" onclick="switchTab('create')">إنشاء غرفة</div>
+      <div class="tab" id="tabJoin" onclick="switchTab('join')">الانضمام</div>
+    </div>
+
+    <!-- CREATE -->
+    <div id="createForm">
+      <div class="form-group">
+        <label class="form-label">اسمك</label>
+        <input class="form-input" id="createName" placeholder="أكتب اسمك..." maxlength="16">
+      </div>
+      <div class="form-group">
+        <label class="form-label">نوع اللعبة</label>
+        <div class="mode-btns">
+          <button class="mode-btn active" id="modeIndiv" onclick="setMode('individual')">فردي 👤</button>
+          <button class="mode-btn" id="modeTeam" onclick="setMode('team')">فرق 🤝</button>
+        </div>
+      </div>
+      <button class="primary-btn" id="createBtn" onclick="createRoom()">🎲 إنشاء الغرفة</button>
+    </div>
+
+    <!-- JOIN -->
+    <div id="joinForm" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">اسمك</label>
+        <input class="form-input" id="joinName" placeholder="أكتب اسمك..." maxlength="16">
+      </div>
+      <div class="form-group">
+        <label class="form-label">كود الغرفة</label>
+        <input class="form-input" id="joinCode" placeholder="الكود المكوّن من 4 أحرف..." maxlength="4" style="letter-spacing:.15em;text-transform:uppercase;">
+      </div>
+      <button class="primary-btn" id="joinBtn" onclick="joinRoom()">🚀 انضمام</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ WAITING ROOM ══════ -->
+<div id="waitRoom">
+  <div class="wait-card">
+    <div class="wait-title">⏳ انتظار اللاعبين...</div>
+    <div class="wait-code" id="waitCode">----</div>
+    <button class="copy-btn" style="margin-bottom:8px;" onclick="copyCode()">📋 نسخ الكود</button>
+    <div class="players-list" id="waitPlayersList"></div>
+    <div class="start-hint" id="startHint">انتظر على الأقل لاعبَين للبدء</div>
+    <button class="start-btn" id="startBtn" onclick="startGame()" disabled>▶ بدء اللعبة</button>
+  </div>
+</div>
+
+<!-- ══════ GAME ══════ -->
+<div id="gameScreen">
+  <div class="game-header">
+    <div class="game-title">💣 الصناديق</div>
+    <div class="turn-badge" id="turnBadge">جارٍ التحميل...</div>
+  </div>
+
+  <div class="players-strip" id="playersStrip"></div>
+  <div class="status-bar" id="statusBar">جاري تحضير اللعبة...</div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="action-btns">
+  <button class="fuse-btn"    id="fuseBtn"    onclick="startDrawMode()">🔥 اشعل الفتيل</button>
+  <button class="cancel-btn"  id="cancelBtn"  onclick="cancelDraw()">❌ إلغاء</button>
+  <button class="confirm-btn" id="confirmBtn" onclick="confirmExplosion()">💥 فجّر!</button>
+</div>
+
+<!-- ══════ WIN OVERLAY ══════ -->
+<div id="winOverlay">
+  <div class="win-card">
+    <div class="win-emoji" id="winEmoji">🏆</div>
+    <div class="win-title" id="winTitle">فزت!</div>
+    <div class="win-sub" id="winSub"></div>
+    <button class="win-again" onclick="backToLobby()">🔄 العب مجدداً</button>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   CONFIG — ضع Ably API Key هنا
+══════════════════════════════════════════════════════ */
+const ABLY_KEY = 'YOUR_ABLY_API_KEY_HERE'; // ← ضع مفتاحك هنا
+
+/* ══════════════════════════════════════════════════════
+   CONSTANTS
+══════════════════════════════════════════════════════ */
+const TOTAL = 100, COLS = 10;
+const PLAYER_COLORS = ['#3b82f6','#f59e0b','#ef4444','#22c55e'];
+const PLAYER_CSS    = ['p1','p2','p3','p4'];
+const PLAYER_NAMES_FA = ['أزرق','أصفر','أحمر','أخضر'];
+const BOMB_COLOR = '#c026d3';
+
+// Arrow color per player (for hints)
+const FIRE_ARROW_COLORS = {
+  0:'#3b82f6', 1:'#f59e0b', 2:'#ef4444', 3:'#22c55e'
+};
+
+const DIR_MAP = {
+  '-1,0':'up','1,0':'down','0,-1':'right','0,1':'left',
+  '-1,-1':'upright','-1,1':'upleft','1,-1':'downright','1,1':'downleft'
+};
+
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+let ably, channel;
+let myId    = null;   // clientId
+let myName  = '';
+let roomCode= '';
+let isHost  = false;
+let gameMode= 'individual'; // 'individual'|'team'
+let gameStarted = false;
+let gameOver= false;
+
+// Players: [{id, name, colorIdx, team?}]
+let players = [];
+
+// Game state (synced from host)
+let types   = [];   // 'empty'|'fire_N'|'bomb'  (N = owner player index)
+let cellState= [];  // {state:'closed'|'hint'|'fire'|'locked', hints:[{playerIdx,dir,dist}], lockedBy?}
+let firePositions = {}; // {playerIdx: boxIdx}
+let bombIndex = -1;
+
+// Local draw state
+let drawMode = false, isDrawing = false, drawnPath = [];
+let myFireFound = false; // has THIS player found their own fire?
+
+/* ══════════════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════════════ */
+function uid(){return Math.random().toString(36).slice(2,10);}
+function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<4;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
+function cheb(a,b){return Math.max(Math.abs((0|a/COLS)-(0|b/COLS)),Math.abs(a%COLS-b%COLS));}
+function adjTo(a,b){return Math.abs((0|a/COLS)-(0|b/COLS))<=1&&Math.abs(a%COLS-b%COLS)<=1&&a!==b;}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;}
+function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+function show(id,v){const el=document.getElementById(id);if(el)el.style.display=v?'':'none';}
+function myPlayerIdx(){return players.findIndex(p=>p.id===myId);}
+
+function showToast(msg,type='info',dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast '+type;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+/* ══════════════════════════════════════════════════════
+   LOBBY UI
+══════════════════════════════════════════════════════ */
+function switchTab(t){
+  document.getElementById('tabCreate').classList.toggle('active',t==='create');
+  document.getElementById('tabJoin').classList.toggle('active',t==='join');
+  show('createForm',t==='create');
+  show('joinForm',t==='join');
+}
+function setMode(m){
+  gameMode=m;
+  document.getElementById('modeIndiv').classList.toggle('active',m==='individual');
+  document.getElementById('modeTeam').classList.toggle('active',m==='team');
+}
+
+/* ══════════════════════════════════════════════════════
+   ABLY SETUP
+══════════════════════════════════════════════════════ */
+function initAbly(onReady){
+  myId = uid();
+  ably = new Ably.Realtime({key:ABLY_KEY, clientId:myId});
+  ably.connection.on('connected',()=>{
+    document.getElementById('connBadge').classList.add('connected');
+    onReady();
+  });
+  ably.connection.on('disconnected',()=>{
+    document.getElementById('connBadge').classList.remove('connected');
+  });
+}
+
+function subscribeChannel(code){
+  channel = ably.channels.get('boxgame-'+code);
+
+  channel.subscribe('player-join', msg=>{
+    const d=msg.data;
+    if(!players.find(p=>p.id===d.id)){
+      players.push(d);
+      updateWaitRoom();
+      if(isHost) broadcastPlayers();
+    }
+  });
+
+  channel.subscribe('players-sync', msg=>{
+    if(msg.clientId===myId)return;
+    players=msg.data;
+    updateWaitRoom();
+  });
+
+  channel.subscribe('game-start', msg=>{
+    if(msg.clientId===myId)return;
+    applyGameState(msg.data);
+    startGameScreen();
+  });
+
+  channel.subscribe('box-open', msg=>{
+    if(msg.clientId===myId)return;
+    handleBoxOpen(msg.data.idx, msg.data.playerId, false);
+  });
+
+  channel.subscribe('box-lock', msg=>{
+    if(msg.clientId===myId)return;
+    applyLock(msg.data.idx, msg.data.playerId, msg.data.newBomb, msg.data.newFire, msg.data.affectedHints);
+  });
+
+  channel.subscribe('fuse-drawn', msg=>{
+    if(msg.clientId===myId)return;
+    animateFuse(msg.data.path, msg.data.playerId, msg.data.hit);
+  });
+
+  channel.subscribe('game-over', msg=>{
+    if(msg.clientId===myId)return;
+    showWinner(msg.data.winnerId, msg.data.winnerName, false);
+  });
+}
+
+function broadcastPlayers(){
+  channel.publish('players-sync', players);
+}
+
+/* ══════════════════════════════════════════════════════
+   CREATE ROOM
+══════════════════════════════════════════════════════ */
+function createRoom(){
+  const name=document.getElementById('createName').value.trim();
+  if(!name){showToast('اكتب اسمك أولاً','bad');return;}
+  myName=name;
+  roomCode=genCode();
+  isHost=true;
+
+  initAbly(()=>{
+    subscribeChannel(roomCode);
+    const me={id:myId,name:myName,colorIdx:0,team:0};
+    players=[me];
+    document.getElementById('lobby').style.display='none';
+    document.getElementById('waitRoom').style.display='flex';
+    document.getElementById('waitCode').textContent=roomCode;
+    updateWaitRoom();
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   JOIN ROOM
+══════════════════════════════════════════════════════ */
+function joinRoom(){
+  const name=document.getElementById('joinName').value.trim();
+  const code=document.getElementById('joinCode').value.trim().toUpperCase();
+  if(!name){showToast('اكتب اسمك','bad');return;}
+  if(code.length!==4){showToast('الكود 4 أحرف','bad');return;}
+  myName=name;roomCode=code;isHost=false;
+
+  initAbly(()=>{
+    subscribeChannel(roomCode);
+    const colorIdx=players.length%4;
+    const me={id:myId,name:myName,colorIdx,team:colorIdx%2};
+    channel.publish('player-join',me);
+    players.push(me);
+    document.getElementById('lobby').style.display='none';
+    document.getElementById('waitRoom').style.display='flex';
+    document.getElementById('waitCode').textContent=roomCode;
+    updateWaitRoom();
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   WAIT ROOM
+══════════════════════════════════════════════════════ */
+function updateWaitRoom(){
+  const list=document.getElementById('waitPlayersList');
+  list.innerHTML=players.map((p,i)=>`
+    <div class="player-row">
+      <div class="player-color" style="background:${PLAYER_COLORS[p.colorIdx]};box-shadow:0 0 6px ${PLAYER_COLORS[p.colorIdx]};"></div>
+      <div class="player-name">${p.name}</div>
+      ${i===0?'<div class="player-badge">منظّم</div>':''}
+    </div>
+  `).join('');
+
+  const canStart=players.length>=2;
+  document.getElementById('startBtn').disabled=!canStart||!isHost;
+  document.getElementById('startHint').textContent=
+    !isHost?'انتظر المنظّم ليبدأ...' :
+    canStart?'جاهز للبدء!' :'انتظر على الأقل لاعبَين';
+}
+
+function copyCode(){
+  navigator.clipboard.writeText(roomCode).then(()=>showToast('تم نسخ الكود!','good')).catch(()=>{});
+}
+
+/* ══════════════════════════════════════════════════════
+   START GAME (host only)
+══════════════════════════════════════════════════════ */
+function startGame(){
+  if(!isHost||players.length<2)return;
+
+  // Assign colors
+  players.forEach((p,i)=>{p.colorIdx=i%4;p.team=i%2;});
+
+  // Build game state
+  const state=buildGameState();
+  channel.publish('game-start',state);
+  applyGameState(state);
+  startGameScreen();
+}
+
+function buildGameState(){
+  const pos=shuffle(Array.from({length:TOTAL},(_,i)=>i));
+  const t=Array(TOTAL).fill('empty');
+  const fp={};
+  const n=players.length;
+
+  // assign fires (one per player)
+  for(let i=0;i<n;i++){
+    t[pos[i]]='fire_'+i;
+    fp[i]=pos[i];
+  }
+  // bomb
+  const bi=pos[n];
+  t[bi]='bomb';
+
+  return {types:t, firePositions:fp, bombIndex:bi, players, gameMode};
+}
+
+function applyGameState(state){
+  types=[...state.types];
+  firePositions={...state.firePositions};
+  bombIndex=state.bombIndex;
+  players=[...state.players];
+  gameMode=state.gameMode;
+  cellState=Array.from({length:TOTAL},()=>({state:'closed',hints:[],lockedBy:null}));
+  gameOver=false;
+  drawnPath=[];
+  drawMode=false;
+  isDrawing=false;
+  myFireFound=false;
+}
+
+/* ══════════════════════════════════════════════════════
+   GAME SCREEN
+══════════════════════════════════════════════════════ */
+function startGameScreen(){
+  document.getElementById('waitRoom').style.display='none';
+  const gs=document.getElementById('gameScreen');
+  gs.style.display='flex';
+  gameStarted=true;
+  buildGrid();
+  renderPlayersStrip();
+  updateTurnBadge();
+  setStatus('انقر على الصناديق لاكتشافها 🔍','');
+}
+
+/* ── GRID ── */
+function buildGrid(){
+  const g=document.getElementById('grid');
+  g.innerHTML='';
+  for(let i=0;i<TOTAL;i++){
+    const b=document.createElement('div');
+    b.id='box-'+i;
+    b.className='box';
+    b.addEventListener('click',e=>{if(!drawMode)tapBox(parseInt(b.id.split('-')[1]));});
+    // touch for draw
+    b.addEventListener('touchstart',onTouchStart,{passive:false});
+    b.addEventListener('touchmove',onTouchMove,{passive:false});
+    b.addEventListener('touchend',onTouchEnd,{passive:false});
+    b.addEventListener('mousedown',onMouseDown);
+    b.addEventListener('mouseover',onMouseOver);
+    b.addEventListener('mouseup',onMouseUp);
+    g.appendChild(b);
+    renderCell(i);
+  }
+}
+
+function renderCell(i){
+  const el=document.getElementById('box-'+i);
+  if(!el)return;
+  const cs=cellState[i];
+  el.innerHTML='';
+  el.className='box';
+  if(drawMode)el.classList.add('draw-mode-cell');
+
+  if(cs.state==='closed'){
+    el.classList.add('closed');
+  } else if(cs.state==='locked'){
+    el.classList.add('locked');
+  } else if(cs.state==='hint'){
+    el.classList.add('hint');
+    renderArrows(el,i,cs.hints);
+  } else if(cs.state==='fire'){
+    // which player?
+    const pType=types[i];
+    const pIdx=parseInt(pType.split('_')[1]);
+    el.classList.add('fire-'+PLAYER_CSS[pIdx%4]);
+    // flame emoji with color
+    const img=document.createElement('span');
+    img.style.cssText='font-size:.9rem;';
+    img.textContent='🔥';
+    el.appendChild(img);
+  }
+}
+
+function renderArrows(el,idx,hints){
+  if(!hints||hints.length===0)return;
+  const wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;gap:2px;align-items:center;justify-content:center;pointer-events:none;flex-wrap:wrap;';
+  hints.forEach(h=>{
+    const color=h.isBomb?BOMB_COLOR:FIRE_ARROW_COLORS[h.playerIdx%4];
+    const dr=Math.sign((0|h.targetIdx/COLS)-(0|idx/COLS));
+    const dc=Math.sign(h.targetIdx%COLS-idx%COLS);
+    const dir=DIR_MAP[`${dr},${dc}`]||'up';
+    const w=document.createElement('div');w.className='arr-wrap';
+    const a=document.createElement('span');
+    a.className='arr '+dir;
+    a.style.setProperty('--ac',color);
+    a.style.setProperty('--s','5px');
+    a.style.filter=`drop-shadow(0 0 2px ${color})`;
+    const l=document.createElement('span');l.className='arr-lbl';l.style.color=color;
+    l.textContent=h.isBomb?'💣':'🔥';
+    w.appendChild(a);w.appendChild(l);
+    wrap.appendChild(w);
+  });
+  el.appendChild(wrap);
+}
+
+/* ── PLAYERS STRIP ── */
+function renderPlayersStrip(){
+  const strip=document.getElementById('playersStrip');
+  strip.innerHTML=players.map(p=>{
+    const ci=p.colorIdx%4;
+    return `<div class="p-chip" id="chip-${p.id}">
+      <div class="dot" style="background:${PLAYER_COLORS[ci]};box-shadow:0 0 5px ${PLAYER_COLORS[ci]};"></div>
+      <span class="nm">${p.name}</span>
+      <span class="flame" id="flame-${p.id}">○</span>
+    </div>`;
+  }).join('');
+}
+
+function updateFlame(playerId, found){
+  const fl=document.getElementById('flame-'+playerId);
+  if(fl)fl.textContent=found?'🔥':'○';
+}
+
+function updateTurnBadge(){
+  const badge=document.getElementById('turnBadge');
+  badge.textContent='لعبك في أي وقت';
+  badge.className='turn-badge mine';
+}
+
+/* ── STATUS ── */
+function setStatus(t,cls=''){
+  const sb=document.getElementById('statusBar');
+  sb.textContent=t;sb.className='status-bar '+(cls||'');
+}
+
+/* ══════════════════════════════════════════════════════
+   BOX TAP LOGIC
+══════════════════════════════════════════════════════ */
+function tapBox(idx){
+  if(gameOver||drawMode)return;
+  const cs=cellState[idx];
+
+  // LOCKED: do nothing
+  if(cs.state==='locked')return;
+
+  const myIdx=myPlayerIdx();
+  const cellType=types[idx];
+
+  // ── BOMB ──
+  if(cellType==='bomb'){
+    // flash, then lock self + hints, move bomb
+    const el=document.getElementById('box-'+idx);
+    el.className='box bomb-flash';el.textContent='💣';
+    // collect affected hints
+    const affectedHints=[];
+    for(let i=0;i<TOTAL;i++){
+      if(cellState[i].state==='hint'){
+        const hadBomb=cellState[i].hints.some(h=>h.isBomb);
+        if(hadBomb)affectedHints.push(i);
+      }
+    }
+    // move bomb
+    const newBomb=movePiece('bomb',-1);
+    // regenerate bomb hints
+    setTimeout(()=>{
+      applyLock(idx, myId, newBomb, null, affectedHints);
+      channel.publish('box-lock',{idx,playerId:myId,newBomb,newFire:null,affectedHints});
+      setStatus('💣 القنبلة هربت! تلميحاتها اتغيرت','warn');
+    },600);
+    return;
+  }
+
+  // ── FIRE ──
+  if(cellType&&cellType.startsWith('fire_')){
+    const ownerIdx=parseInt(cellType.split('_')[1]);
+    if(ownerIdx===myIdx){
+      // my own fire — toggle open/close
+      if(cs.state==='fire'){
+        cellState[idx].state='closed';
+        myFireFound=false;
+        updateFlame(myId,false);
+        show('fuseBtn',false);
+      } else {
+        cellState[idx].state='fire';
+        myFireFound=true;
+        updateFlame(myId,true);
+        show('fuseBtn',true);
+        setStatus('🔥 وجدت شعلتك! ارسم الفتيل للقنبلة','good');
+        showToast('🔥 شعلتك اتكشفت!','good');
+      }
+      renderCell(idx);
+      channel.publish('box-open',{idx,playerId:myId});
+    } else {
+      // not my fire — lock it + hints + move
+      const affectedHints=[];
+      for(let i=0;i<TOTAL;i++){
+        if(cellState[i].state==='hint'){
+          const relevant=cellState[i].hints.some(h=>!h.isBomb&&h.playerIdx===ownerIdx);
+          if(relevant)affectedHints.push(i);
+        }
+      }
+      const newFire=movePiece('fire_'+ownerIdx, ownerIdx);
+      applyLock(idx, myId, null, {ownerIdx, newPos:newFire}, affectedHints);
+      channel.publish('box-lock',{idx,playerId:myId,newBomb:null,newFire:{ownerIdx,newPos:newFire},affectedHints});
+      showToast(`🔒 شعلة ${players[ownerIdx]?.name||'لاعب'} اتقفلت!`,'bad');
+    }
+    return;
+  }
+
+  // ── EMPTY / HINT toggle ──
+  if(cs.state==='hint'){
+    cellState[idx].state='closed';
+    cellState[idx].hints=[];
+  } else {
+    cellState[idx].state='hint';
+    cellState[idx].hints=computeHints(idx);
+  }
+  renderCell(idx);
+  channel.publish('box-open',{idx,playerId:myId});
+}
+
+/* ══════════════════════════════════════════════════════
+   REMOTE EVENTS
+══════════════════════════════════════════════════════ */
+function handleBoxOpen(idx, playerId, fromSelf){
+  // just re-render (state already updated by host broadcast or local)
+  // For simplicity: remote opens just show hint locally too
+  const cs=cellState[idx];
+  if(cs.state==='closed'){
+    const cellType=types[idx];
+    if(cellType&&cellType.startsWith('fire_')){
+      const ownerIdx=parseInt(cellType.split('_')[1]);
+      if(players[ownerIdx]?.id===playerId){
+        cellState[idx].state='fire';
+        updateFlame(playerId,true);
+      }
+    } else if(!cellType||cellType==='empty'){
+      cellState[idx].state='hint';
+      cellState[idx].hints=computeHints(idx);
+    }
+    renderCell(idx);
+  }
+}
+
+function applyLock(idx, playerId, newBomb, newFire, affectedHints){
+  // lock the main cell
+  cellState[idx].state='locked';
+  const el=document.getElementById('box-'+idx);
+  if(el){el.classList.add('lock-anim');}
+  renderCell(idx);
+
+  // move pieces
+  if(newBomb!==null&&newBomb!==undefined){
+    types[bombIndex]='empty';
+    bombIndex=newBomb;
+    types[bombIndex]='bomb';
+  }
+  if(newFire){
+    const {ownerIdx,newPos}=newFire;
+    types[firePositions[ownerIdx]]='empty';
+    firePositions[ownerIdx]=newPos;
+    types[newPos]='fire_'+ownerIdx;
+    if(players[ownerIdx]?.id===myId){
+      myFireFound=false;
+      updateFlame(myId,false);
+      show('fuseBtn',false);
+    }
+    updateFlame(players[ownerIdx]?.id,false);
+  }
+
+  // regenerate affected hint cells
+  if(affectedHints&&affectedHints.length){
+    affectedHints.forEach(i=>{
+      if(cellState[i].state==='hint'){
+        cellState[i].hints=computeHints(i);
+        renderCell(i);
+      }
+    });
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   HINTS COMPUTATION
+══════════════════════════════════════════════════════ */
+function computeHints(idx){
+  const hints=[];
+  const myIdx=myPlayerIdx();
+
+  // For each player, show hint to their fire IF that fire is revealed
+  players.forEach((p,pi)=>{
+    const fi=firePositions[pi];
+    if(fi===undefined||fi===null)return;
+    if(cellState[fi].state!=='fire')return; // only show if fire is open
+    if(fi===idx)return;
+    const dist=cheb(idx,fi);
+    hints.push({playerIdx:pi,targetIdx:fi,dist,isBomb:false});
+  });
+
+  // Bomb hint (always)
+  if(bombIndex>=0&&bombIndex!==idx){
+    const dist=cheb(idx,bombIndex);
+    hints.push({playerIdx:-1,targetIdx:bombIndex,dist,isBomb:true});
+  }
+
+  return hints;
+}
+
+/* ══════════════════════════════════════════════════════
+   MOVE PIECE (host only)
+══════════════════════════════════════════════════════ */
+function movePiece(pieceType, ownerIdx){
+  const cands=[];
+  for(let i=0;i<TOTAL;i++){
+    if((types[i]==='empty'||types[i]==='')&&cellState[i].state==='closed'){
+      cands.push(i);
+    }
+  }
+  if(!cands.length)return -1;
+  const newPos=cands[Math.floor(Math.random()*cands.length)];
+  types[newPos]=pieceType;
+  if(pieceType==='bomb'){
+    types[bombIndex]='empty';
+    bombIndex=newPos;
+  } else if(pieceType.startsWith('fire_')&&ownerIdx>=0){
+    types[firePositions[ownerIdx]]='empty';
+    firePositions[ownerIdx]=newPos;
+  }
+  return newPos;
+}
+
+/* ══════════════════════════════════════════════════════
+   DRAW MODE (fuse)
+══════════════════════════════════════════════════════ */
+function startDrawMode(){
+  if(!myFireFound)return;
+  drawMode=true;isDrawing=false;drawnPath=[];
+  show('fuseBtn',false);show('cancelBtn',true);show('confirmBtn',false);
+  setStatus('ارسم الفتيل من شعلتك للقنبلة (فوق الصناديق المقفوله فقط)','drawing');
+  buildGrid();
+}
+function cancelDraw(){
+  drawnPath.forEach(i=>{
+    cellState[i].state=cellState[i].state; // keep state
+    const el=document.getElementById('box-'+i);
+    if(el)el.classList.remove('path-drawn','fire-glow');
+    renderCell(i);
+  });
+  drawMode=false;isDrawing=false;drawnPath=[];
+  show('cancelBtn',false);show('confirmBtn',false);
+  show('fuseBtn',myFireFound);
+  setStatus('','');buildGrid();
+}
+
+async function confirmExplosion(){
+  if(drawnPath.length<2)return;
+  drawMode=false;
+  show('cancelBtn',false);show('confirmBtn',false);
+  const hit=drawnPath[drawnPath.length-1]===bombIndex;
+  await animateFuse(drawnPath,myId,hit);
+  channel.publish('fuse-drawn',{path:drawnPath,playerId:myId,hit});
+  if(hit){
+    gameOver=true;
+    showWinner(myId,myName,true);
+    channel.publish('game-over',{winnerId:myId,winnerName:myName});
+  } else {
+    drawnPath=[];
+    setStatus('❌ الفتيل مصابش القنبلة!','warn');
+    setTimeout(()=>{buildGrid();show('fuseBtn',myFireFound);setStatus('ارسم الفتيل تاني','');},1500);
+  }
+}
+
+async function animateFuse(path,playerId,hit){
+  setStatus('🔥 الفتيل بيشتعل...','drawing');
+  for(let i=1;i<path.length;i++){
+    await wait(90);
+    const el=document.getElementById('box-'+path[i]);
+    if(el){
+      el.classList.add('fuse-travel');
+      await wait(200);
+      el.classList.remove('fuse-travel','path-drawn');
+      renderCell(path[i]);
+    }
+  }
+  if(hit){
+    await wait(150);
+    const bel=document.getElementById('box-'+bombIndex);
+    if(bel){bel.className='box bomb-win';bel.textContent='💥';bel.style.fontSize='1.4rem';}
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   WIN
+══════════════════════════════════════════════════════ */
+function showWinner(winnerId,winnerName,isMe){
+  gameOver=true;
+  show('fuseBtn',false);show('cancelBtn',false);show('confirmBtn',false);
+  document.getElementById('winEmoji').textContent=isMe?'🏆':'😅';
+  document.getElementById('winTitle').textContent=isMe?'فزت! 🎉':`${winnerName} فاز!`;
+  document.getElementById('winSub').textContent=isMe?'فجّرت القنبلة بنجاح!':'فجّر القنبلة قبلك!';
+  document.getElementById('winOverlay').style.display='flex';
+}
+
+function backToLobby(){
+  location.reload();
+}
+
+/* ══════════════════════════════════════════════════════
+   TOUCH / MOUSE DRAW
+══════════════════════════════════════════════════════ */
+function boxFromPoint(x,y){
+  const el=document.elementFromPoint(x,y);
+  if(!el)return -1;
+  const b=el.closest('.box');
+  if(!b)return -1;
+  return parseInt(b.id.split('-')[1]);
+}
+
+function onTouchStart(e){
+  if(!drawMode)return;
+  e.preventDefault();
+  const t=e.touches[0];
+  const idx=boxFromPoint(t.clientX,t.clientY);
+  if(idx<0)return;
+  const cs=cellState[idx];
+  // must start from own fire
+  if(cs.state!=='fire')return;
+  const myIdx=myPlayerIdx();
+  if(types[idx]!=='fire_'+myIdx)return;
+  isDrawing=true;drawnPath=[idx];
+  const el=document.getElementById('box-'+idx);
+  if(el)el.classList.add('fire-glow');
+}
+
+function onTouchMove(e){
+  if(!drawMode||!isDrawing)return;
+  e.preventDefault();
+  const t=e.touches[0];
+  addToPath(boxFromPoint(t.clientX,t.clientY));
+}
+
+function onTouchEnd(e){
+  if(!drawMode)return;
+  e.preventDefault();
+  isDrawing=false;
+  if(drawnPath.length>1){show('confirmBtn',true);}
+}
+
+function onMouseDown(e){
+  if(!drawMode)return;
+  const b=e.target.closest('.box');
+  if(!b)return;
+  const idx=parseInt(b.id.split('-')[1]);
+  const cs=cellState[idx];
+  if(cs.state!=='fire')return;
+  const myIdx=myPlayerIdx();
+  if(types[idx]!=='fire_'+myIdx)return;
+  isDrawing=true;drawnPath=[idx];
+  b.classList.add('fire-glow');
+}
+
+function onMouseOver(e){
+  if(!drawMode||!isDrawing)return;
+  const b=e.target.closest('.box');
+  if(!b)return;
+  addToPath(parseInt(b.id.split('-')[1]));
+}
+
+function onMouseUp(e){
+  if(!drawMode)return;
+  isDrawing=false;
+  if(drawnPath.length>1){show('confirmBtn',true);}
+}
+
+function addToPath(idx){
+  if(idx<0)return;
+  const cs=cellState[idx];
+  // can only draw on closed/locked boxes
+  if(cs.state!=='closed'&&cs.state!=='locked')return;
+  const last=drawnPath[drawnPath.length-1];
+  if(idx===last)return;
+  // backtrack
+  if(drawnPath.length>=2&&drawnPath[drawnPath.length-2]===idx){
+    const rem=drawnPath.pop();
+    const el=document.getElementById('box-'+rem);
+    if(el){el.classList.remove('path-drawn');renderCell(rem);}
+    return;
+  }
+  if(!adjTo(last,idx)||drawnPath.includes(idx))return;
+  drawnPath.push(idx);
+  const el=document.getElementById('box-'+idx);
+  if(el)el.classList.add('path-drawn');
+  show('confirmBtn',true);
+}
+
+/* hide confirm if path too short */
+document.addEventListener('mouseup',()=>{
+  if(drawMode&&drawnPath.length<2)show('confirmBtn',false);
+});
+
+/* init show */
+show('fuseBtn',false);show('cancelBtn',false);show('confirmBtn',false);
+</script>
+</body>
+</html>
